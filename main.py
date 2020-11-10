@@ -1,8 +1,9 @@
 from datetime import datetime, date, time, timedelta
 import logging
 
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, MessageHandler, Filters, CommandHandler, ConversationHandler, RegexHandler
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from telegram.ext import Updater, MessageHandler, Filters, CommandHandler, ConversationHandler, RegexHandler, \
+    CallbackQueryHandler
 
 from data import db_session
 from data.users import Users
@@ -32,7 +33,7 @@ PROGRESS,STATISTICS = range(2)
 
 def start(bot, update, user_data):
     userid = update.message.from_user.id
-    username = update.message.from_user.first_name + ' ' + update.message.from_user.last_name
+    username = update.message.from_user.first_name
     session = db_session.create_session()
     if not isAuthorized(userid):
         user = Users(
@@ -135,6 +136,98 @@ def stats(bot, update):
     return STATISTICS
 
 
+def today(bot, update):
+    query = update.callback_query
+    query.answer()
+    userid = query.message.chat_id
+    session = db_session.create_session()
+    keyboard = [
+        [InlineKeyboardButton("Год", callback_data="year"),
+         InlineKeyboardButton("Месяц", callback_data="month"),
+         InlineKeyboardButton("Неделя", callback_data="week"),
+         InlineKeyboardButton("Сегодня", callback_data="today")]
+    ]
+    cats = [cat for cat in session.query(Categories).filter(Categories.userid == userid).all()]
+    answer = 'Ваш прогресс за сегодня:\n'
+    for cat in cats:
+        total = sum([c.count for c in session.query(Counts).filter(Counts.userid == userid, Counts.catid == cat.id,
+                                                                   Counts.updated >= datetime.today().date())])
+        answer += cat.title + ': ' + str(total) + '\n'
+    bot.edit_message_text(chat_id=userid,
+                          message_id=query.message.message_id, text=answer, reply_markup=InlineKeyboardMarkup(keyboard),
+                          parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+    return STATISTICS
+
+
+def week(bot, update):
+    query = update.callback_query
+    query.answer()
+    userid = query.message.chat_id
+    session = db_session.create_session()
+    keyboard = [
+        [InlineKeyboardButton("Год", callback_data="year"),
+         InlineKeyboardButton("Месяц", callback_data="month"),
+         InlineKeyboardButton("Неделя", callback_data="week"),
+         InlineKeyboardButton("Сегодня", callback_data="today")]
+    ]
+    cats = [cat for cat in session.query(Categories).filter(Categories.userid == userid).all()]
+    answer = 'Ваш прогресс за эту неделю:\n'
+    for cat in cats:
+        total = sum([c.count for c in session.query(Counts).filter(Counts.userid == userid, Counts.catid == cat.id,
+                                                                   Counts.updated >= datetime.today().date()-timedelta(days=datetime.today().weekday()))])
+        answer += cat.title + ': ' + str(total) + '\n'
+    bot.edit_message_text(chat_id=userid,
+                          message_id=query.message.message_id, text=answer, reply_markup=InlineKeyboardMarkup(keyboard),
+                          parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+    return STATISTICS
+
+
+def month(bot, update):
+    query = update.callback_query
+    query.answer()
+    userid = query.message.chat_id
+    session = db_session.create_session()
+    keyboard = [
+        [InlineKeyboardButton("Год", callback_data="year"),
+         InlineKeyboardButton("Месяц", callback_data="month"),
+         InlineKeyboardButton("Неделя", callback_data="week"),
+         InlineKeyboardButton("Сегодня", callback_data="today")]
+    ]
+    cats = [cat for cat in session.query(Categories).filter(Categories.userid == userid).all()]
+    answer = 'Ваш прогресс за этот месяц:\n'
+    for cat in cats:
+        total = sum([c.count for c in session.query(Counts).filter(Counts.userid == userid, Counts.catid == cat.id,
+                                                                   Counts.updated >= datetime.today().replace(day=1))])
+        answer += cat.title + ': ' + str(total) + '\n'
+    bot.edit_message_text(chat_id=userid,
+                          message_id=query.message.message_id, text=answer, reply_markup=InlineKeyboardMarkup(keyboard),
+                          parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+    return STATISTICS
+
+
+def year(bot, update):
+    query = update.callback_query
+    query.answer()
+    userid = query.message.chat_id
+    session = db_session.create_session()
+    keyboard = [
+        [InlineKeyboardButton("Год", callback_data="year"),
+         InlineKeyboardButton("Месяц", callback_data="month"),
+         InlineKeyboardButton("Неделя", callback_data="week"),
+         InlineKeyboardButton("Сегодня", callback_data="today")]
+    ]
+    cats = [cat for cat in session.query(Categories).filter(Categories.userid == userid).all()]
+    answer = 'Ваш прогресс за этот год:\n'
+    for cat in cats:
+        total = sum([c.count for c in session.query(Counts).filter(Counts.userid == userid, Counts.catid == cat.id,
+                                                                   Counts.updated >= datetime.today().replace(day=1, month=1))])
+        answer += cat.title + ': ' + str(total) + '\n'
+    bot.edit_message_text(chat_id=userid,
+                          message_id=query.message.message_id, text=answer, reply_markup=InlineKeyboardMarkup(keyboard),
+                          parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+    return STATISTICS
+
+
 def main():
     db_session.global_init("db/personal")
     updater = Updater(TOKEN)
@@ -149,7 +242,11 @@ def main():
                        RegexHandler('^Мой прогресс$', stats),
                 MessageHandler(Filters.text, textInput, pass_user_data=True)],
             STATISTICS:[RegexHandler('^Добавить$',add_progress),
-                       RegexHandler('^Мой прогресс$', stats)]
+                       RegexHandler('^Мой прогресс$', stats),
+                        CallbackQueryHandler(today, pattern='^today$'),
+                        CallbackQueryHandler(week, pattern='^week$'),
+                        CallbackQueryHandler(month, pattern='^month$'),
+                        CallbackQueryHandler(year, pattern='^year$'),]
 
         },
 
