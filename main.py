@@ -9,7 +9,7 @@ from data.users import Users
 from data.counts import Counts
 from data.categories import Categories
 
-TOKEN = '1411094474:AAG18T4-xvVTZSy-L0dJTalPov5kBgfRvPs'
+TOKEN = ''
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
