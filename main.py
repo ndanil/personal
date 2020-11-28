@@ -21,15 +21,13 @@ def error(bot, update):
     logger.warning(f'Update {update} caused error {bot.error}')
 
 
-
-
-
 def isAuthorized(userid):
     session = db_session.create_session()
     return userid in [user[0] for user in session.query(Users.userid).all()]
 
 
-PROGRESS,STATISTICS = range(2)
+PROGRESS, STATISTICS = range(2)
+
 
 def start(bot, update, user_data):
     userid = update.message.from_user.id
@@ -42,28 +40,36 @@ def start(bot, update, user_data):
         )
         session.add(user)
         session.commit()
-    update.message.reply_text('Добро пожаловать в бот, который поможет вам вести учет. Учет чего? Решать вам. Бега в километрах, книги в метрах (например, Анатолий Вассерман прочитал около 100 метров "в толщину" книг и примерно столько же журналов к 2012 году)', reply_markup=default_keyboard())
-    if len(session.query(Categories).filter(Categories.userid == userid).all())==0:
-        update.message.reply_text('Напишите через пробел все категории, по которым вы собираетесь вести учет. Например, "Бег(км) Фантастика(стр)"', reply_markup=ReplyKeyboardRemove())
-        user_data['cats']=True
+    update.message.reply_text(
+        'Добро пожаловать в бот, который поможет вам вести учет. Учет чего? Решать вам. Бега в километрах, книги в метрах (например, Анатолий Вассерман прочитал около 100 метров "в толщину" книг и примерно столько же журналов к 2012 году)',
+        reply_markup=default_keyboard())
+    if len(session.query(Categories).filter(Categories.userid == userid).all()) == 0:
+        update.message.reply_text(
+            'Напишите через пробел все категории, по которым вы собираетесь вести учет. Например, "Бег(км) Фантастика(стр)"',
+            reply_markup=ReplyKeyboardRemove())
+        user_data['cats'] = True
     return PROGRESS
+
 
 def catsKeyboard(userid):
     session = db_session.create_session()
     cats = [cat.title for cat in session.query(Categories).filter(Categories.userid == userid).all()]
     keyboard = []
     for i in range(len(cats)):
-        if not i%3:
+        if not i % 3:
             keyboard.append([cats[i]])
         else:
             keyboard[-1].append(cats[i])
     return ReplyKeyboardMarkup(keyboard, row_width=1, resize_keyboard=True)
 
+
 def counts_keyboard():
-    return ReplyKeyboardMarkup([['1'],['5', '10', '15'],['Назад']], row_width=1, resize_keyboard=True)
+    return ReplyKeyboardMarkup([['1'], ['5', '10', '15'], ['Назад']], row_width=1, resize_keyboard=True)
+
 
 def default_keyboard():
-    return ReplyKeyboardMarkup([['Мой прогресс','Добавить']], row_width=1, resize_keyboard=True)
+    return ReplyKeyboardMarkup([['Мой прогресс', 'Добавить']], row_width=1, resize_keyboard=True)
+
 
 def textInput(bot, update, user_data):
     userid = update.message.from_user.id
@@ -72,33 +78,37 @@ def textInput(bot, update, user_data):
         cats = update.message.text.split()
         for cat in cats:
             t = Categories(
-                userid = userid,
+                userid=userid,
                 title=cat
             )
             session.add(t)
         session.commit()
         del user_data['cats']
-        update.message.reply_text('Все ваши категории успешно добавлены!\n Выберите категорию, чтобы зачесть прогресс.', reply_markup=catsKeyboard(userid))
-    elif update.message.text in [cat.title for cat in session.query(Categories).filter(Categories.userid == userid).all()]:
+        update.message.reply_text('Все ваши категории успешно добавлены!\n Выберите категорию, чтобы зачесть прогресс.',
+                                  reply_markup=catsKeyboard(userid))
+    elif update.message.text in [cat.title for cat in
+                                 session.query(Categories).filter(Categories.userid == userid).all()]:
         cat = update.message.text
         user_data['active_cat'] = cat
-        update.message.reply_text('Отлично! Какой у Вас прогресс по '+ cat +'?', reply_markup=counts_keyboard())
-    elif update.message.text=='Назад':
+        update.message.reply_text('Отлично! Какой у Вас прогресс по ' + cat + '?', reply_markup=counts_keyboard())
+    elif update.message.text == 'Назад':
         del user_data['active_cat']
-        update.message.reply_text('Хотите посмотреть Ваш текущий прогресс или добавить еще?', reply_markup=default_keyboard())
+        update.message.reply_text('Хотите посмотреть Ваш текущий прогресс или добавить еще?',
+                                  reply_markup=default_keyboard())
     elif update.message.text.isdigit() and user_data['active_cat']:
         data = Counts(
             userid=userid,
-            catid = session.query(Categories.id).filter(Categories.userid==userid , Categories.title==user_data['active_cat']).one()[0],
+            catid=session.query(Categories.id).filter(Categories.userid == userid,
+                                                      Categories.title == user_data['active_cat']).one()[0],
             count=int(update.message.text),
             updated=datetime.now()
 
         )
         session.add(data)
         session.commit()
-        update.message.reply_text('Добавлено '+update.message.text+' в Ваш личный прогресс по '+ user_data['active_cat'])
+        update.message.reply_text(
+            'Добавлено ' + update.message.text + ' в Ваш личный прогресс по ' + user_data['active_cat'])
     return PROGRESS
-
 
 
 def end(bot, update):
@@ -130,8 +140,11 @@ def stats(bot, update):
     cats = [cat for cat in session.query(Categories).filter(Categories.userid == userid).all()]
     answer = 'Ваш прогресс за сегодня:\n'
     for cat in cats:
-        total = sum([c.count for c in session.query(Counts).filter(Counts.userid==userid, Counts.catid==cat.id, Counts.updated>= datetime.now() - timedelta(days=datetime.today().weekday(), hours=0, minutes=0, seconds=0, milliseconds=0))])
-        answer+=cat.title+': '+str(total)+'\n'
+        total = sum([c.count for c in session.query(Counts).filter(Counts.userid == userid, Counts.catid == cat.id,
+                                                                   Counts.updated >= datetime.now() - timedelta(
+                                                                       days=datetime.today().weekday(), hours=0,
+                                                                       minutes=0, seconds=0, milliseconds=0))])
+        answer += cat.title + ': ' + str(total) + '\n'
     update.message.reply_text(answer, reply_markup=InlineKeyboardMarkup(keyboard))
     return STATISTICS
 
@@ -174,7 +187,8 @@ def week(bot, update):
     answer = 'Ваш прогресс за эту неделю:\n'
     for cat in cats:
         total = sum([c.count for c in session.query(Counts).filter(Counts.userid == userid, Counts.catid == cat.id,
-                                                                   Counts.updated >= datetime.today().date()-timedelta(days=datetime.today().weekday()))])
+                                                                   Counts.updated >= datetime.today().date() - timedelta(
+                                                                       days=datetime.today().weekday()))])
         answer += cat.title + ': ' + str(total) + '\n'
     bot.edit_message_text(chat_id=userid,
                           message_id=query.message.message_id, text=answer, reply_markup=InlineKeyboardMarkup(keyboard),
@@ -220,12 +234,26 @@ def year(bot, update):
     answer = 'Ваш прогресс за этот год:\n'
     for cat in cats:
         total = sum([c.count for c in session.query(Counts).filter(Counts.userid == userid, Counts.catid == cat.id,
-                                                                   Counts.updated >= datetime.today().replace(day=1, month=1))])
+                                                                   Counts.updated >= datetime.today().replace(day=1,
+                                                                                                              month=1))])
         answer += cat.title + ': ' + str(total) + '\n'
     bot.edit_message_text(chat_id=userid,
                           message_id=query.message.message_id, text=answer, reply_markup=InlineKeyboardMarkup(keyboard),
                           parse_mode=ParseMode.HTML, disable_web_page_preview=True)
     return STATISTICS
+
+
+def addnew(bot, update):
+    userid = update.message.from_user.id
+    session = db_session.create_session()
+    cat = update.message.text.split()[-1]
+    newcat = Categories(
+        userid=userid,
+        title=cat
+    )
+    session.add(newcat)
+    session.commit()
+    update.message.reply_text(f'Создана новая категория {cat}')
 
 
 def main():
@@ -238,15 +266,16 @@ def main():
                       MessageHandler(Filters.text, start, pass_user_data=True)],
 
         states={
-            PROGRESS: [RegexHandler('^Добавить$',add_progress),
+            PROGRESS: [RegexHandler('^Добавить$', add_progress),
                        RegexHandler('^Мой прогресс$', stats),
-                MessageHandler(Filters.text, textInput, pass_user_data=True)],
-            STATISTICS:[RegexHandler('^Добавить$',add_progress),
-                       RegexHandler('^Мой прогресс$', stats),
-                        CallbackQueryHandler(today, pattern='^today$'),
-                        CallbackQueryHandler(week, pattern='^week$'),
-                        CallbackQueryHandler(month, pattern='^month$'),
-                        CallbackQueryHandler(year, pattern='^year$'),]
+                       CommandHandler('a', addnew),
+                       MessageHandler(Filters.text, textInput, pass_user_data=True)],
+            STATISTICS: [RegexHandler('^Добавить$', add_progress),
+                         RegexHandler('^Мой прогресс$', stats),
+                         CallbackQueryHandler(today, pattern='^today$'),
+                         CallbackQueryHandler(week, pattern='^week$'),
+                         CallbackQueryHandler(month, pattern='^month$'),
+                         CallbackQueryHandler(year, pattern='^year$'), ]
 
         },
 
